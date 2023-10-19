@@ -1,0 +1,72 @@
+blueprint:
+  name: Open-Close Sensor Light Control
+  description: >-
+    When an open-close sensor (e.g. door/window sensor) changes to open, a light
+    will turn on, and an adaptive lighting entity will be applied to it. After
+    the sensor changes to closed, and a timeout has passed, the light will turn
+    off.
+  domain: automation
+  input:
+    switch_device_id:
+      name: Switch Device ID
+      description: The device ID of the open-close sensor
+      selector:
+        entity:
+          domain: binary_sensor
+    target_group:
+      name: Light
+      description: >-
+        The light group whose state determines the behavior of this blueprint
+      selector:
+        entity:
+          domain: light
+    adaptive_lighting_entity:
+      name: Adaptive Lighting Entity
+      description: >-
+        The adaptive lighting entity to use to set the light brightness and
+        color. The light group does not need to be a member of this light
+        entity.
+      selector:
+        entity:
+          integration: adaptive_lighting
+    timeout:
+      name: Timeout
+      description: Timeout before light turns off when sensor changes to closed.
+      selector:
+        duration:
+
+alias: "Light: Blueprint for Open/Close sensor control of lights"
+description: >-
+  Turns on a light when a door/window sensor is opened. Turns it off some amount
+  of time after it's closed.
+trigger:
+  - platform: state
+    entity_id: !input switch_device_id
+    to: "on"
+    id: Opened
+  - platform: state
+    entity_id: !input switch_device_id
+    to: "off"
+    for: !input timeout
+    id: Closed
+condition: []
+action:
+  - if:
+      - condition: trigger
+        id:
+          - Opened
+    then:
+      - service: light.turn_on
+        data: {}
+        target:
+          entity_id: !input target_group
+      - service: adaptive_lighting.apply
+        data:
+          entity_id: !input adaptive_lighting_entity
+          lights: !input target_group
+    else:
+      - service: light.turn_off
+        data: {}
+        target:
+          entity_id: !input target_group
+mode: single

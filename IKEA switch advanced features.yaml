@@ -1,0 +1,90 @@
+blueprint:
+  name: IKEA TRÅDFRI E1743 Switch Advanced Features
+  description: When a light group is off, and the off button is pressed, a single light is turned on. When that light group is on, and the on button is pressed, the brightness and color are adapted for the time of day.
+  domain: automation
+  input:
+    switch_device_id:
+      name: Switch Device ID
+      description: The device ID of the TRÅDFRI E1743 switch
+    target_group:
+      name: Light Group
+      description: The light group whose state determines the behavior of this blueprint
+      selector:
+        entity:
+          domain: light
+    adaptive_lighting_entity:
+      name: Adaptive Lighting Entity
+      description: The adaptive lighting entity to use to set the light brightness and color. The light group does not need to be a member of this light entity.
+      selector:
+        entity:
+          integration: adaptive_lighting
+    light_brightness:
+      name: Light Brightness (%)
+      description: The light brightness (in percent) that should be used when the off button is pressed when the group is off. Typically 1.
+      selector:
+        number:
+          min: 0
+          max: 100
+          unit_of_measurement: "%"
+    light_temperature:
+      name: Light Temperature
+      description: The color temperature that should be used when the off button is pressed when the group is off.
+      selector:
+        color_temp:
+          min_mireds: 153
+          max_mireds: 500
+    single_light:
+      name: Single Light
+      description: The single light that should be turned on (to the above color temperature and brightness), when the off button is pressed when the group is off.
+      selector:
+        entity:
+          domain: light
+
+alias: "Light: IKEA E1743 Advanced Features Blueprint"
+description: Additional features for IKEA switches
+trigger:
+  - platform: event
+    event_type: zha_event
+    event_data:
+      device_id: !input switch_device_id
+      command: "on"
+    id: On button
+    alias: When on button is pressed
+  - platform: event
+    event_type: zha_event
+    event_data:
+      device_id: !input switch_device_id
+      command: "off"
+    id: Off button
+    alias: When off button is pressed
+condition: []
+action:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: On button
+          - condition: state
+            entity_id: !input target_group
+            state: "on"
+        sequence:
+          - service: adaptive_lighting.apply
+            data:
+              entity_id: !input adaptive_lighting_entity
+              lights: !input target_group
+              adapt_brightness: true
+              adapt_color: true
+            alias: Adapt lights for time of day
+      - conditions:
+          - condition: trigger
+            id: Off button
+          - condition: state
+            entity_id: !input target_group
+            state: "off"
+        sequence:
+          - service: light.turn_on
+            data:
+              brightness_pct: !input light_brightness
+              color_temp: !input light_temperature
+            target:
+              entity_id: !input single_light
+mode: single
